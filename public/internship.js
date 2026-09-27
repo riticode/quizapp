@@ -15,6 +15,9 @@
   var btnLoader = btnSubmit.querySelector('.btn-loader');
   var formMessage = $('form-message');
 
+  var state = { participantId: null };
+  var SESSION_KEY = 'quizblitz_session';
+
   // File Upload UI Update
   fileInput.addEventListener('change', function (e) {
     var file = e.target.files[0];
@@ -70,12 +73,15 @@
 
     var name = $('app-name').value.trim();
     var email = $('app-email').value.trim();
+    var phone = $('app-phone').value.trim();
     var college = $('app-college').value.trim();
     var branch = $('app-branch').value.trim();
     var year = $('app-year').value.trim();
+    var category = $('app-category').value.trim();
+    var whyHire = $('app-why').value.trim();
     var file = fileInput.files[0];
 
-    if (!name || !email || !college || !branch || !year || !file) {
+    if (!name || !email || !phone || !college || !branch || !year || !category || !whyHire || !file) {
       showMessage('Please fill in all fields and upload a PDF resume.', 'error');
       return;
     }
@@ -91,9 +97,12 @@
         action: 'submitInternship',
         name: name,
         email: email,
+        phone: phone,
         college: college,
         branch: branch,
         year: year,
+        category: category,
+        whyHire: whyHire,
         resumeName: file.name,
         resumeData: base64Data
       };
@@ -133,5 +142,50 @@
       btnLoader.hidden = true;
     });
   });
+
+  // Pre-fill data
+  function init() {
+    try {
+      var raw = localStorage.getItem(SESSION_KEY);
+      if (raw) {
+        var session = JSON.parse(raw);
+        if (session.participantId) {
+          state.participantId = session.participantId;
+          
+          btnSubmit.disabled = true;
+          btnText.textContent = 'Loading details...';
+          
+          fetch(CONFIG.APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({ action: 'getParticipantStatus', participantId: state.participantId })
+          })
+          .then(res => res.json())
+          .then(data => {
+            if (data.valid) {
+              if (data.internshipState !== 'OPEN') {
+                showMessage('The internship application is not open yet. Please wait for the admin.', 'error');
+                form.style.opacity = '0.5';
+                form.style.pointerEvents = 'none';
+                return;
+              }
+              
+              $('app-name').value = data.name || '';
+              $('app-branch').value = data.branch || 'CSE';
+              $('app-phone').value = data.contact || '';
+            }
+            btnSubmit.disabled = false;
+            btnText.textContent = 'Submit Application';
+          })
+          .catch(() => {
+            btnSubmit.disabled = false;
+            btnText.textContent = 'Submit Application';
+          });
+        }
+      }
+    } catch (e) {}
+  }
+  
+  init();
 
 })();

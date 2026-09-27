@@ -54,6 +54,8 @@
     lbPodium: $('lb-podium'),
     lbMyResult: $('lb-my-result'),
     btnFinish: $('btn-finish'),
+    btnApplyInternship: $('btn-apply-internship'),
+    internshipStatus: $('internship-status'),
     loadingOverlay: $('loading-overlay')
   };
 
@@ -539,6 +541,14 @@
     } else {
       els.lbMyResult.hidden = true;
     }
+
+    if (data.internshipState === 'OPEN') {
+      els.internshipStatus.style.display = 'none';
+      els.btnApplyInternship.style.display = 'inline-block';
+    } else {
+      els.internshipStatus.style.display = 'block';
+      els.btnApplyInternship.style.display = 'none';
+    }
   }
 
   // ========== INIT ==========
@@ -551,6 +561,10 @@
     // "Refresh Rankings" button
     els.btnFinish.addEventListener('click', function () {
       loadLeaderboard();
+    });
+
+    els.btnApplyInternship.addEventListener('click', function() {
+      window.location.href = 'internship.html';
     });
 
     // Prevent double-tap zoom on mobile

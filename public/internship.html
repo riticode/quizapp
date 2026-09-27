@@ -35,9 +35,16 @@
           <input type="text" id="app-name" required placeholder="John Doe">
         </div>
 
-        <div class="form-group">
-          <label for="app-email">Email Address</label>
-          <input type="email" id="app-email" required placeholder="john@example.com">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="app-email">Email Address</label>
+            <input type="email" id="app-email" required placeholder="john@example.com">
+          </div>
+          
+          <div class="form-group">
+            <label for="app-phone">Phone Number</label>
+            <input type="text" id="app-phone" required placeholder="1234567890">
+          </div>
         </div>
 
         <div class="form-row">
@@ -52,9 +59,28 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label for="app-year">Year of Study</label>
+            <input type="text" id="app-year" required value="Freshman / 1st Year">
+          </div>
+          
+          <div class="form-group">
+            <label for="app-category">Internship Category</label>
+            <select id="app-category" required class="custom-select">
+              <option value="" disabled selected>Select an option...</option>
+              <option value="Marketing Intern">Marketing Intern</option>
+              <option value="Digital Marketing Intern">Digital Marketing Intern</option>
+              <option value="Social Media Intern">Social Media Intern</option>
+              <option value="Event Operations Intern">Event Operations Intern</option>
+              <option value="Content Creation Intern">Content Creation Intern</option>
+            </select>
+          </div>
+        </div>
+
         <div class="form-group">
-          <label for="app-year">Year of Study</label>
-          <input type="text" id="app-year" required value="Freshman / 1st Year">
+          <label for="app-why">Why should Times Internet hire you?</label>
+          <textarea id="app-why" required placeholder="Tell us about your passion, skills, and why you are the best fit..." rows="4"></textarea>
         </div>
 
         <div class="form-group">

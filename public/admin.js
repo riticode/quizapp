@@ -35,6 +35,7 @@
     lbTableWrap: $('lb-table-wrap'),
     lbCount: $('lb-count'),
     btnStartQuiz: $('btn-start-quiz'),
+    btnOpenInternship: $('btn-open-internship'),
     quizStatus: $('quiz-status')
   };
 
@@ -163,11 +164,17 @@
       els.quizStatus.style.display = 'inline';
       els.quizStatus.textContent = 'WAITING';
       els.btnStartQuiz.style.display = 'inline-block';
+      els.btnOpenInternship.style.display = 'none';
     } else {
       els.quizStatus.style.display = 'inline';
       els.quizStatus.textContent = 'LIVE';
       els.quizStatus.style.color = 'var(--success)';
       els.btnStartQuiz.style.display = 'none';
+      if (data.internshipState === 'OPEN') {
+        els.btnOpenInternship.style.display = 'none';
+      } else {
+        els.btnOpenInternship.style.display = 'inline-block';
+      }
     }
 
     // Stats
@@ -356,6 +363,20 @@
           alert('Failed to start quiz: ' + err.message);
           els.btnStartQuiz.disabled = false;
           els.btnStartQuiz.textContent = 'Start Quiz';
+        });
+    });
+
+    els.btnOpenInternship.addEventListener('click', function() {
+      els.btnOpenInternship.disabled = true;
+      els.btnOpenInternship.textContent = 'Opening...';
+      apiCall({ action: 'openInternship', adminEmail: adminCreds.email, adminPassword: adminCreds.password })
+        .then(function() {
+          fetchDashboard();
+        })
+        .catch(function(err) {
+          alert('Failed to open internship: ' + err.message);
+          els.btnOpenInternship.disabled = false;
+          els.btnOpenInternship.textContent = 'Open Internship';
         });
     });
 

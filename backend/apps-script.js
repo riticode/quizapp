@@ -63,6 +63,12 @@ function getQuizState() {
   return state || 'WAITING';
 }
 
+function getInternshipState() {
+  var props = PropertiesService.getScriptProperties();
+  var state = props.getProperty('INTERNSHIP_STATE');
+  return state || 'CLOSED';
+}
+
 // ========== MAIN ROUTER ==========
 
 function doPost(e) {
@@ -79,6 +85,7 @@ function doPost(e) {
       case 'adminLogin': return handleAdminLogin(body);
       case 'getAdminDashboard': return handleGetAdminDashboard(body);
       case 'startQuiz': return handleStartQuiz(body);
+      case 'openInternship': return handleOpenInternship(body);
       case 'submitInternship': return handleSubmitInternship(body);
       default: return jsonResponse({ error: 'Unknown action' });
     }
@@ -228,7 +235,7 @@ function handleGetLeaderboard(body) {
       myResult = { rank: myRank, name: pMap[participantId].name, correct: pMap[participantId].totalCorrect, total: totalQ, totalTime: (pMap[participantId].totalTime / 1000).toFixed(1) };
     }
     lock.releaseLock();
-    return jsonResponse({ success: true, leaderboard: top3, myResult: myResult });
+    return jsonResponse({ success: true, leaderboard: top3, myResult: myResult, internshipState: getInternshipState() });
   } catch (err) {
     lock.releaseLock();
     return jsonResponse({ error: 'Leaderboard failed: ' + err.message });
@@ -241,9 +248,9 @@ function handleGetParticipantStatus(body) {
   var participantId = sanitize(body.participantId);
   var pSheet = getSheet('Participants');
   var pData = pSheet.getDataRange().getValues();
-  var found = false, name = '';
+  var found = false, name = '', branch = '', contact = '';
   for (var i = 1; i < pData.length; i++) {
-    if (pData[i][0] === participantId) { found = true; name = pData[i][1]; break; }
+    if (pData[i][0] === participantId) { found = true; name = pData[i][1]; branch = pData[i][2]; contact = pData[i][3]; break; }
   }
   if (!found) return jsonResponse({ success: true, valid: false });
 
@@ -255,7 +262,12 @@ function handleGetParticipantStatus(body) {
   }
   
   var isComplete = maxAnswered >= QUIZ_DATA.length;
-  return jsonResponse({ success: true, valid: true, name: name, questionsAnswered: maxAnswered, isComplete: isComplete, nextQuestion: isComplete ? -1 : maxAnswered + 1, quizState: getQuizState() });
+  return jsonResponse({ 
+    success: true, valid: true, name: name, branch: branch, contact: contact, 
+    questionsAnswered: maxAnswered, isComplete: isComplete, 
+    nextQuestion: isComplete ? -1 : maxAnswered + 1, 
+    quizState: getQuizState(), internshipState: getInternshipState() 
+  });
 }
 
 // ========== ADMIN METHODS ==========
@@ -269,6 +281,13 @@ function handleStartQuiz(body) {
   if (!verifyAdmin(body)) return jsonResponse({ error: 'Unauthorized' });
   var props = PropertiesService.getScriptProperties();
   props.setProperty('QUIZ_STATE', 'STARTED');
+  return jsonResponse({ success: true });
+}
+
+function handleOpenInternship(body) {
+  if (!verifyAdmin(body)) return jsonResponse({ error: 'Unauthorized' });
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('INTERNSHIP_STATE', 'OPEN');
   return jsonResponse({ success: true });
 }
 
@@ -308,6 +327,7 @@ function handleGetAdminDashboard(body) {
   return jsonResponse({
     success: true,
     quizState: getQuizState(),
+    internshipState: getInternshipState(),
     stats: { registered: Object.keys(pMap).length, inProgress: totalInProgress, completed: totalCompleted },
     leaderboard: leaderboard,
     recentActivity: recentResponses.slice(0, 8)
@@ -319,11 +339,14 @@ function handleGetAdminDashboard(body) {
 function handleSubmitInternship(body) {
   var name = sanitize(body.name);
   var email = sanitize(body.email);
+  var phone = sanitize(body.phone);
   var college = sanitize(body.college);
   var branch = sanitize(body.branch);
   var year = sanitize(body.year);
+  var category = sanitize(body.category);
+  var whyHire = sanitize(body.whyHire);
   
-  if (!name || !email) return jsonResponse({ error: 'Name and email are required.' });
+  if (!name || !email || !phone) return jsonResponse({ error: 'Name, email, and phone are required.' });
 
   var lock = LockService.getScriptLock();
   lock.waitLock(15000);
@@ -342,7 +365,7 @@ function handleSubmitInternship(body) {
     }
 
     var sheet = getSheet('Internships');
-    sheet.appendRow([new Date().toISOString(), name, email, college, branch, year, resumeUrl]);
+    sheet.appendRow([new Date().toISOString(), name, email, phone, college, branch, year, category, whyHire, resumeUrl]);
     lock.releaseLock();
     return jsonResponse({ success: true });
   } catch(err) {
@@ -361,5 +384,5 @@ function setupSheets() {
   if (rSheet.getLastRow() === 0) rSheet.appendRow(['participantId', 'questionNumber', 'selectedOption', 'isCorrect', 'timeTaken', 'submittedAt']);
   
   var iSheet = ss.getSheetByName('Internships') || ss.insertSheet('Internships');
-  if (iSheet.getLastRow() === 0) iSheet.appendRow(['Timestamp', 'Name', 'Email', 'College', 'Branch', 'Year', 'Resume URL']);
+  if (iSheet.getLastRow() === 0) iSheet.appendRow(['Timestamp', 'Name', 'Email', 'Phone', 'College', 'Branch', 'Year', 'Category', 'Why Hire', 'Resume URL']);
 }
