@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="QuizBlitz Admin — Live presenter dashboard for real-time quiz monitoring.">
+  <meta name="robots" content="noindex, nofollow">
+  <title>QuizBlitz — Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+  <!-- ========== ADMIN LOGIN ========== -->
+  <section id="admin-login" class="admin-screen active">
+    <div class="login-container">
+      <div class="login-brand">
+        <div class="login-icon">⚡</div>
+        <h1>QuizBlitz</h1>
+        <p>Admin Dashboard</p>
+      </div>
+      <form id="login-form" autocomplete="off" novalidate>
+        <div class="login-field">
+          <label for="admin-email">Email</label>
+          <input type="email" id="admin-email" placeholder="admin@quizblitz.com" required autocomplete="email">
+        </div>
+        <div class="login-field">
+          <label for="admin-password">Password</label>
+          <input type="password" id="admin-password" placeholder="Enter password" required>
+        </div>
+        <button type="submit" id="btn-login" class="btn-login">
+          <span class="btn-text">Login</span>
+          <span class="btn-loader" hidden></span>
+        </button>
+        <p id="login-error" class="login-error" hidden></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========== DASHBOARD ========== -->
+  <section id="admin-dashboard" class="admin-screen">
+    <!-- Top Bar -->
+    <header class="dash-header">
+      <div class="dash-brand">
+        <span class="dash-brand-icon">⚡</span>
+        <span class="dash-brand-name">QuizBlitz</span>
+        <span class="dash-badge-admin">ADMIN</span>
+      </div>
+      <div class="dash-header-right">
+        <div class="live-indicator">
+          <span class="live-dot"></span>
+          <span>LIVE</span>
+        </div>
+        <span id="last-updated" class="last-updated">Updated just now</span>
+        <button id="btn-logout" class="btn-logout" title="Logout">⏻</button>
+      </div>
+    </header>
+
+    <!-- Stats Cards -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-value" id="stat-registered">0</div>
+        <div class="stat-label">Registered</div>
+      </div>
+      <div class="stat-card stat-card-active">
+        <div class="stat-icon">▶</div>
+        <div class="stat-value" id="stat-active">0</div>
+        <div class="stat-label">In Progress</div>
+      </div>
+      <div class="stat-card stat-card-done">
+        <div class="stat-icon">✅</div>
+        <div class="stat-value" id="stat-completed">0</div>
+        <div class="stat-label">Completed</div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="dash-grid">
+      <!-- Left Column: Question Stats + Recent Activity -->
+      <div class="dash-col">
+        <div class="panel">
+          <div class="panel-header">
+            <h2>📊 Question Stats</h2>
+          </div>
+          <div id="q-stats-list" class="q-stats-list">
+            <p class="panel-empty">Waiting for responses...</p>
+          </div>
+        </div>
+
+        <div class="panel panel-recent">
+          <div class="panel-header">
+            <h2>⚡ Recent Activity</h2>
+          </div>
+          <div id="recent-activity" class="recent-list">
+            <p class="panel-empty">No activity yet...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Live Leaderboard -->
+      <div class="dash-col">
+        <div class="panel panel-leaderboard">
+          <div class="panel-header">
+            <h2>🏆 Live Leaderboard</h2>
+            <span id="lb-count" class="lb-count"></span>
+          </div>
+          <div id="lb-table-wrap" class="lb-table-wrap">
+            <p class="panel-empty">Waiting for participants...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script src="config.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

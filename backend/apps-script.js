@@ -1,15 +1,17 @@
 // =============================================
-// Google Apps Script — Quiz Backend
+// Google Apps Script — Quiz Backend (with Admin)
 // =============================================
 // Deploy as Web App: Execute as "Me", Access "Anyone"
-// Paste this entire file into a Google Apps Script project
-// linked to a Google Sheet with two sheets: "Participants" and "Responses"
 //
 // Sheet setup:
 // "Participants" columns: participantId | name | branch | contact | registeredAt
 // "Responses" columns: participantId | questionNumber | selectedOption | isCorrect | timeTaken | submittedAt
-//
-// After deploying, copy the web app URL and set it as APPS_SCRIPT_URL in config.js
+
+// ========== ADMIN CREDENTIALS ==========
+// IMPORTANT: Change these before deploying!
+// These are checked server-side only — never exposed to participants.
+var ADMIN_EMAIL = 'admin@quizblitz.com';
+var ADMIN_PASSWORD = 'change-this-password';
 
 // ========== QUIZ DATA (from question.txt — verbatim) ==========
 var QUIZ_DATA = [
@@ -99,7 +101,6 @@ var QUIZ_DATA = [
   }
 ];
 
-// Map letter answers to 0-based index
 var ANSWER_MAP = { A: 0, B: 1, C: 2, D: 3 };
 
 // ========== HELPERS ==========
@@ -129,11 +130,8 @@ function validateContact(contact) {
   return /^\d{10,15}$/.test(cleaned);
 }
 
-// ========== CORS ==========
-
-function doOptions(e) {
-  return ContentService.createTextOutput('')
-    .setMimeType(ContentService.MimeType.TEXT);
+function verifyAdmin(body) {
+  return body.adminEmail === ADMIN_EMAIL && body.adminPassword === ADMIN_PASSWORD;
 }
 
 // ========== MAIN ROUTER ==========
@@ -152,6 +150,12 @@ function doPost(e) {
         return handleSubmitAnswer(body);
       case 'getLeaderboard':
         return handleGetLeaderboard(body);
+      case 'getParticipantStatus':
+        return handleGetParticipantStatus(body);
+      case 'adminLogin':
+        return handleAdminLogin(body);
+      case 'getAdminDashboard':
+        return handleGetAdminDashboard(body);
       default:
         return jsonResponse({ error: 'Unknown action' });
     }
@@ -194,7 +198,6 @@ function handleRegister(body) {
     var now = new Date().toISOString();
 
     sheet.appendRow([participantId, name, branch, contact, now]);
-
     lock.releaseLock();
 
     return jsonResponse({
@@ -225,12 +228,10 @@ function handleGetQuestion(body) {
   var serverTime = new Date().getTime();
   var deadline = serverTime + 10500; // 10s + 500ms network grace
 
-  // Store the deadline in PropertiesService for this participant+question
   var props = PropertiesService.getScriptProperties();
   var key = 'deadline_' + participantId + '_' + questionNumber;
   props.setProperty(key, deadline.toString());
 
-  // Return question WITHOUT the answer
   return jsonResponse({
     success: true,
     questionNumber: questionNumber,
@@ -247,7 +248,7 @@ function handleGetQuestion(body) {
 function handleSubmitAnswer(body) {
   var participantId = sanitize(body.participantId);
   var questionNumber = parseInt(body.questionNumber, 10);
-  var selectedOption = parseInt(body.selectedOption, 10); // 0-based index, or -1 for timeout
+  var selectedOption = parseInt(body.selectedOption, 10);
 
   if (!participantId) {
     return jsonResponse({ error: 'Missing participant ID.' });
@@ -265,7 +266,6 @@ function handleSubmitAnswer(body) {
     var responseData = responseSheet.getDataRange().getValues();
     for (var i = 1; i < responseData.length; i++) {
       if (responseData[i][0] === participantId && responseData[i][1] === questionNumber) {
-        // Already submitted — return the existing result without re-recording
         var qData = QUIZ_DATA[questionNumber - 1];
         var correctIdx = ANSWER_MAP[qData.answer];
         lock.releaseLock();
@@ -286,7 +286,7 @@ function handleSubmitAnswer(body) {
     var deadlineStr = props.getProperty(key);
     var now = new Date().getTime();
 
-    var timeTaken = 10000; // default: full 10s for timeout
+    var timeTaken = 10000;
     var timedOut = false;
 
     if (deadlineStr) {
@@ -295,7 +295,6 @@ function handleSubmitAnswer(body) {
       timeTaken = Math.min(now - questionStartTime, 10000);
 
       if (now > deadline) {
-        // Late submission — mark as timeout
         timedOut = true;
         selectedOption = -1;
         timeTaken = 10000;
@@ -315,7 +314,6 @@ function handleSubmitAnswer(body) {
       timeTaken = 10000;
     }
 
-    // Record response
     responseSheet.appendRow([
       participantId,
       questionNumber,
@@ -325,9 +323,7 @@ function handleSubmitAnswer(body) {
       new Date().toISOString()
     ]);
 
-    // Clean up deadline property
     props.deleteProperty(key);
-
     lock.releaseLock();
 
     return jsonResponse({
@@ -345,7 +341,7 @@ function handleSubmitAnswer(body) {
   }
 }
 
-// ========== LEADERBOARD ==========
+// ========== PARTICIPANT LEADERBOARD ==========
 
 function handleGetLeaderboard(body) {
   var participantId = sanitize(body.participantId);
@@ -356,11 +352,9 @@ function handleGetLeaderboard(body) {
   try {
     var pSheet = getSheet('Participants');
     var rSheet = getSheet('Responses');
-
     var participants = pSheet.getDataRange().getValues();
     var responses = rSheet.getDataRange().getValues();
 
-    // Build participant map: id -> { name, totalCorrect, totalTime }
     var pMap = {};
     for (var i = 1; i < participants.length; i++) {
       var pid = participants[i][0];
@@ -373,23 +367,18 @@ function handleGetLeaderboard(body) {
       };
     }
 
-    // Aggregate responses
     for (var j = 1; j < responses.length; j++) {
       var rid = responses[j][0];
       if (!pMap[rid]) continue;
-
       pMap[rid].questionsAnswered++;
-
-      if (responses[j][3] === true || responses[j][3] === 'TRUE' || responses[j][3] === true) {
+      if (responses[j][3] === true || responses[j][3] === 'TRUE') {
         pMap[rid].totalCorrect++;
       }
-
       var time = parseInt(responses[j][4], 10);
       if (isNaN(time)) time = 10000;
       pMap[rid].totalTime += time;
     }
 
-    // For unanswered questions, add 10s each (treat as timeout)
     var totalQ = QUIZ_DATA.length;
     for (var pid in pMap) {
       var unanswered = totalQ - pMap[pid].questionsAnswered;
@@ -398,7 +387,6 @@ function handleGetLeaderboard(body) {
       }
     }
 
-    // Only include participants who answered all 12 questions
     var completed = [];
     for (var pid in pMap) {
       if (pMap[pid].questionsAnswered >= totalQ) {
@@ -406,13 +394,11 @@ function handleGetLeaderboard(body) {
       }
     }
 
-    // Sort: more correct first, then lower total time
     completed.sort(function (a, b) {
       if (b.totalCorrect !== a.totalCorrect) return b.totalCorrect - a.totalCorrect;
       return a.totalTime - b.totalTime;
     });
 
-    // Top 3 only
     var top3 = completed.slice(0, 3).map(function (p, idx) {
       return {
         rank: idx + 1,
@@ -423,7 +409,6 @@ function handleGetLeaderboard(body) {
       };
     });
 
-    // Find current participant's result
     var myResult = null;
     if (participantId && pMap[participantId]) {
       var me = pMap[participantId];
@@ -456,8 +441,205 @@ function handleGetLeaderboard(body) {
   }
 }
 
-// ========== SHEET SETUP HELPER ==========
-// Run this once to create the sheets with headers
+// ========== PARTICIPANT STATUS (for session recovery) ==========
+
+function handleGetParticipantStatus(body) {
+  var participantId = sanitize(body.participantId);
+  if (!participantId) {
+    return jsonResponse({ error: 'Missing participant ID.', valid: false });
+  }
+
+  var pSheet = getSheet('Participants');
+  var pData = pSheet.getDataRange().getValues();
+  var found = false;
+  var name = '';
+
+  for (var i = 1; i < pData.length; i++) {
+    if (pData[i][0] === participantId) {
+      found = true;
+      name = pData[i][1];
+      break;
+    }
+  }
+
+  if (!found) {
+    return jsonResponse({ success: true, valid: false });
+  }
+
+  var rSheet = getSheet('Responses');
+  var rData = rSheet.getDataRange().getValues();
+  var maxAnswered = 0;
+
+  for (var j = 1; j < rData.length; j++) {
+    if (rData[j][0] === participantId) {
+      var qNum = parseInt(rData[j][1], 10);
+      if (qNum > maxAnswered) maxAnswered = qNum;
+    }
+  }
+
+  var totalQ = QUIZ_DATA.length;
+  var isComplete = maxAnswered >= totalQ;
+  var nextQuestion = isComplete ? -1 : maxAnswered + 1;
+
+  return jsonResponse({
+    success: true,
+    valid: true,
+    name: name,
+    questionsAnswered: maxAnswered,
+    isComplete: isComplete,
+    nextQuestion: nextQuestion
+  });
+}
+
+// ========== ADMIN LOGIN ==========
+
+function handleAdminLogin(body) {
+  if (!verifyAdmin(body)) {
+    return jsonResponse({ error: 'Invalid email or password.' });
+  }
+  return jsonResponse({ success: true });
+}
+
+// ========== ADMIN DASHBOARD ==========
+
+function handleGetAdminDashboard(body) {
+  if (!verifyAdmin(body)) {
+    return jsonResponse({ error: 'Unauthorized' });
+  }
+
+  var pSheet = getSheet('Participants');
+  var rSheet = getSheet('Responses');
+  var pData = pSheet.getDataRange().getValues();
+  var rData = rSheet.getDataRange().getValues();
+
+  // Build participant map
+  var pMap = {};
+  for (var i = 1; i < pData.length; i++) {
+    pMap[pData[i][0]] = {
+      name: pData[i][1],
+      branch: pData[i][2],
+      correct: 0,
+      totalTime: 0,
+      questionsAnswered: 0
+    };
+  }
+
+  // Aggregate responses + build question stats + recent activity
+  var questionStats = {};
+  var recentResponses = [];
+
+  for (var j = 1; j < rData.length; j++) {
+    var pid = rData[j][0];
+    var qNum = parseInt(rData[j][1], 10);
+    var isCorrect = rData[j][3] === true || rData[j][3] === 'TRUE';
+    var timeTaken = parseInt(rData[j][4], 10) || 10000;
+    var submittedAt = rData[j][5];
+
+    if (pMap[pid]) {
+      pMap[pid].questionsAnswered++;
+      if (isCorrect) pMap[pid].correct++;
+      pMap[pid].totalTime += timeTaken;
+    }
+
+    // Question stats
+    if (!questionStats[qNum]) {
+      questionStats[qNum] = { answered: 0, correct: 0, totalTime: 0 };
+    }
+    questionStats[qNum].answered++;
+    if (isCorrect) questionStats[qNum].correct++;
+    questionStats[qNum].totalTime += timeTaken;
+
+    // Recent activity (keep last 50 for sorting)
+    recentResponses.push({
+      name: pMap[pid] ? pMap[pid].name : 'Unknown',
+      q: qNum,
+      isCorrect: isCorrect,
+      timeTaken: (timeTaken / 1000).toFixed(1),
+      at: submittedAt
+    });
+  }
+
+  // Stats
+  var totalRegistered = Object.keys(pMap).length;
+  var totalCompleted = 0;
+  var totalInProgress = 0;
+  var totalQ = QUIZ_DATA.length;
+
+  // Build leaderboard
+  var leaderboard = [];
+  for (var pid in pMap) {
+    var p = pMap[pid];
+    if (p.questionsAnswered >= totalQ) {
+      totalCompleted++;
+    } else if (p.questionsAnswered > 0) {
+      totalInProgress++;
+    }
+
+    // Add unanswered penalty time
+    var unanswered = totalQ - p.questionsAnswered;
+    var adjustedTime = p.totalTime + (unanswered * 10000);
+
+    leaderboard.push({
+      name: p.name,
+      branch: p.branch,
+      correct: p.correct,
+      totalTime: adjustedTime,
+      totalTimeDisplay: (adjustedTime / 1000).toFixed(1),
+      questionsAnswered: p.questionsAnswered,
+      total: totalQ,
+      isComplete: p.questionsAnswered >= totalQ
+    });
+  }
+
+  // Sort: more correct first, then lower total time
+  leaderboard.sort(function (a, b) {
+    if (b.correct !== a.correct) return b.correct - a.correct;
+    return a.totalTime - b.totalTime;
+  });
+
+  // Add ranks
+  for (var k = 0; k < leaderboard.length; k++) {
+    leaderboard[k].rank = k + 1;
+  }
+
+  // Build question stats array
+  var qStatsArray = [];
+  for (var q = 1; q <= totalQ; q++) {
+    var qs = questionStats[q] || { answered: 0, correct: 0, totalTime: 0 };
+    qStatsArray.push({
+      q: q,
+      questionText: QUIZ_DATA[q - 1].text.substring(0, 80),
+      answered: qs.answered,
+      correct: qs.correct,
+      accuracy: qs.answered > 0 ? Math.round((qs.correct / qs.answered) * 100) : 0,
+      avgTime: qs.answered > 0 ? (qs.totalTime / qs.answered / 1000).toFixed(1) : '0.0',
+      totalParticipants: totalRegistered
+    });
+  }
+
+  // Recent activity — last 8
+  recentResponses.sort(function (a, b) {
+    return String(b.at).localeCompare(String(a.at));
+  });
+  var recent = recentResponses.slice(0, 8);
+
+  return jsonResponse({
+    success: true,
+    stats: {
+      registered: totalRegistered,
+      inProgress: totalInProgress,
+      completed: totalCompleted
+    },
+    questionStats: qStatsArray,
+    leaderboard: leaderboard,
+    recentActivity: recent,
+    timestamp: new Date().toISOString()
+  });
+}
+
+// ========== SHEET SETUP ==========
+// Run this once from the GAS editor to create sheets with headers.
+// Also set ADMIN_EMAIL and ADMIN_PASSWORD at the top of this file.
 function setupSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 

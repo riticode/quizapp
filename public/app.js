@@ -3,6 +3,7 @@
 // =============================================
 // Zero dependencies. Vanilla JS.
 // Server is the authority for timing and scoring.
+// Session persisted in localStorage for refresh recovery.
 // =============================================
 
 (function () {
@@ -16,7 +17,7 @@
     selectedOption: -1,
     timerInterval: null,
     deadline: 0,
-    serverTimeOffset: 0, // local - server
+    serverTimeOffset: 0,
     locked: false
   };
 
@@ -51,11 +52,13 @@
     btnNext: $('btn-next'),
     lbPodium: $('lb-podium'),
     lbMyResult: $('lb-my-result'),
+    btnFinish: $('btn-finish'),
     loadingOverlay: $('loading-overlay')
   };
 
   var OPTION_LETTERS = ['A', 'B', 'C', 'D'];
-  var CIRCUMFERENCE = 2 * Math.PI * 20; // timer circle circumference
+  var CIRCUMFERENCE = 2 * Math.PI * 20;
+  var SESSION_KEY = 'quizblitz_session';
 
   // ========== NETWORK ==========
 
@@ -64,7 +67,7 @@
 
     return fetch(CONFIG.APPS_SCRIPT_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'text/plain' }, // GAS requires text/plain for CORS
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(body),
       redirect: 'follow'
     })
@@ -86,6 +89,35 @@
         }
         throw err;
       });
+  }
+
+  // ========== SESSION PERSISTENCE ==========
+
+  function saveSession() {
+    var session = {
+      participantId: state.participantId,
+      currentQuestion: state.currentQuestion,
+      totalQuestions: state.totalQuestions
+    };
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    } catch (e) { /* localStorage unavailable */ }
+  }
+
+  function loadSession() {
+    try {
+      var raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function clearSession() {
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch (e) { /* ok */ }
   }
 
   // ========== SCREEN MANAGEMENT ==========
@@ -164,6 +196,7 @@
         state.participantId = data.participantId;
         state.totalQuestions = data.totalQuestions || CONFIG.TOTAL_QUESTIONS;
         state.currentQuestion = 1;
+        saveSession();
         loadQuestion(1);
       })
       .catch(function (err) {
@@ -174,12 +207,50 @@
       });
   }
 
+  // ========== SESSION RECOVERY ==========
+
+  function recoverSession(session) {
+    showLoading(true);
+    state.participantId = session.participantId;
+    state.totalQuestions = session.totalQuestions || CONFIG.TOTAL_QUESTIONS;
+
+    apiCall({
+      action: 'getParticipantStatus',
+      participantId: session.participantId
+    })
+      .then(function (data) {
+        showLoading(false);
+        if (!data.valid) {
+          // Invalid session — clear and show registration
+          clearSession();
+          return;
+        }
+
+        if (data.isComplete) {
+          // Already finished — show leaderboard with fresh data
+          state.currentQuestion = state.totalQuestions;
+          loadLeaderboard();
+        } else {
+          // Resume from next unanswered question
+          state.currentQuestion = data.nextQuestion;
+          loadQuestion(data.nextQuestion);
+        }
+      })
+      .catch(function () {
+        showLoading(false);
+        // Can't verify — clear session, show registration
+        clearSession();
+      });
+  }
+
   // ========== QUIZ ==========
 
   function loadQuestion(qNum) {
     showLoading(true);
     state.selectedOption = -1;
     state.locked = false;
+    state.currentQuestion = qNum;
+    saveSession();
 
     apiCall({
       action: 'getQuestion',
@@ -194,7 +265,6 @@
       })
       .catch(function (err) {
         showLoading(false);
-        // If we can't load, retry once more after a delay
         setTimeout(function () {
           loadQuestion(qNum);
         }, 1500);
@@ -202,15 +272,12 @@
   }
 
   function renderQuestion(data) {
-    // Update header
     els.qCounter.textContent = data.questionNumber + ' / ' + data.totalQuestions;
     var pct = ((data.questionNumber - 1) / data.totalQuestions) * 100;
     els.progressFill.style.width = pct + '%';
 
-    // Question text
     els.qText.textContent = data.text;
 
-    // Options
     els.qOptions.innerHTML = '';
     data.options.forEach(function (opt, idx) {
       var btn = document.createElement('button');
@@ -236,15 +303,12 @@
   function handleOptionSelect(idx) {
     if (state.locked) return;
 
-    // Deselect previous
     var btns = els.qOptions.querySelectorAll('.option-btn');
     btns.forEach(function (btn) { btn.classList.remove('selected'); });
 
-    // Select new
     btns[idx].classList.add('selected');
     state.selectedOption = idx;
 
-    // Lock and submit
     lockOptions();
     submitAnswer();
   }
@@ -258,12 +322,10 @@
   // ========== TIMER ==========
 
   function startTimer(deadline, serverTime) {
-    // Calculate offset: how far ahead local clock is from server
     var localNow = Date.now();
     state.serverTimeOffset = localNow - serverTime;
     state.deadline = deadline;
 
-    // Reset timer visual
     els.timerCircle.style.strokeDashoffset = '0';
     els.timerCircle.classList.remove('urgent');
     els.timerText.classList.remove('urgent');
@@ -278,24 +340,21 @@
       var seconds = Math.ceil(remaining / 1000);
       var fraction = remaining / CONFIG.QUESTION_TIME_MS;
 
-      // Update visuals
       var offset = CIRCUMFERENCE * (1 - Math.max(0, Math.min(1, fraction)));
       els.timerCircle.style.strokeDashoffset = offset;
       els.timerText.textContent = Math.max(0, Math.min(10, seconds));
 
-      // Urgency at 3 seconds
       if (seconds <= 3) {
         els.timerCircle.classList.add('urgent');
         els.timerText.classList.add('urgent');
       }
 
-      // Time's up
       if (remaining <= 0) {
         clearInterval(state.timerInterval);
         els.timerText.textContent = '0';
         if (!state.locked) {
           lockOptions();
-          submitAnswer(); // timeout submission
+          submitAnswer();
         }
       }
     }, 100);
@@ -320,7 +379,6 @@
         showReveal(data);
       })
       .catch(function (err) {
-        // On failure, try once more then show a generic reveal
         apiCall({
           action: 'submitAnswer',
           participantId: state.participantId,
@@ -331,7 +389,6 @@
             showReveal(data);
           })
           .catch(function () {
-            // Ultimate fallback — move on
             showReveal({
               isCorrect: false,
               correctOption: -1,
@@ -348,7 +405,6 @@
     var isTimeout = state.selectedOption === -1;
     var isCorrect = data.isCorrect;
 
-    // Icon
     els.revealIcon.className = 'reveal-icon';
     els.revealStatus.className = 'reveal-status';
 
@@ -369,7 +425,6 @@
       els.revealStatus.textContent = 'Incorrect';
     }
 
-    // Correct answer text
     if (data.correctOption >= 0 && data.correctOption <= 3) {
       var optBtns = els.qOptions.querySelectorAll('.option-btn .option-text');
       var correctText = OPTION_LETTERS[data.correctOption] + ') ' +
@@ -379,10 +434,8 @@
       els.revealAnswerText.textContent = '—';
     }
 
-    // PM Hook
     els.revealHookText.textContent = data.hook || '';
 
-    // Button text
     var isLast = state.currentQuestion >= state.totalQuestions;
     var nextBtn = els.btnNext;
     nextBtn.querySelector('.btn-text').textContent = isLast ? 'See Results' : 'Next Question';
@@ -395,6 +448,7 @@
       loadLeaderboard();
     } else {
       state.currentQuestion++;
+      saveSession();
       loadQuestion(state.currentQuestion);
     }
   }
@@ -415,7 +469,6 @@
       })
       .catch(function (err) {
         showLoading(false);
-        // Retry once
         setTimeout(function () {
           loadLeaderboard();
         }, 2000);
@@ -465,11 +518,14 @@
   // ========== INIT ==========
 
   function init() {
-    // Registration form
+    // Event listeners
     els.form.addEventListener('submit', handleRegistration);
-
-    // Next button
     els.btnNext.addEventListener('click', handleNext);
+
+    // "Refresh Rankings" button
+    els.btnFinish.addEventListener('click', function () {
+      loadLeaderboard();
+    });
 
     // Prevent double-tap zoom on mobile
     document.addEventListener('touchend', function (e) {
@@ -490,10 +546,17 @@
     // Check config
     if (CONFIG.APPS_SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE') {
       showError('⚠ Backend not configured. Please set APPS_SCRIPT_URL in config.js');
+      return;
     }
+
+    // Check for existing session — recover on refresh
+    var session = loadSession();
+    if (session && session.participantId) {
+      recoverSession(session);
+    }
+    // Otherwise, registration screen is already visible
   }
 
-  // Boot
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
