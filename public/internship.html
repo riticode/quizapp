@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QuizBlitz — Internship Application</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="internship.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+  <!-- BACKGROUND ANIMATION -->
+  <div class="bg-animation">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+  </div>
+
+  <main class="container">
+    <div class="form-wrapper">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <h1>QuizBlitz</h1>
+        <p class="tagline">Join our core team. Build the future of interactive experiences.</p>
+      </div>
+
+      <form id="internship-form" class="application-form">
+        <div class="form-header">
+          <h2>Internship Application</h2>
+        </div>
+
+        <div class="form-group">
+          <label for="app-name">Full Name</label>
+          <input type="text" id="app-name" required placeholder="John Doe">
+        </div>
+
+        <div class="form-group">
+          <label for="app-email">Email Address</label>
+          <input type="email" id="app-email" required placeholder="john@example.com">
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="app-college">College</label>
+            <input type="text" id="app-college" required value="Kalindi College">
+          </div>
+
+          <div class="form-group">
+            <label for="app-branch">Branch</label>
+            <input type="text" id="app-branch" required value="CSE">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="app-year">Year of Study</label>
+          <input type="text" id="app-year" required value="Freshman / 1st Year">
+        </div>
+
+        <div class="form-group">
+          <label for="app-resume">Resume (PDF)</label>
+          <div class="file-upload-wrapper">
+            <input type="file" id="app-resume" accept=".pdf" required class="file-input">
+            <div class="file-custom">
+              <span class="file-icon">📄</span>
+              <span id="file-name" class="file-name">Choose a PDF file...</span>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="btn-submit" class="btn-submit">
+          <span class="btn-text">Submit Application</span>
+          <span class="btn-loader" hidden></span>
+        </button>
+        
+        <div id="form-message" class="form-message" hidden></div>
+      </form>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="internship.js"></script>
+</body>
+</html>

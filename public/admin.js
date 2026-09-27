@@ -33,7 +33,9 @@
     qStatsList: $('q-stats-list'),
     recentActivity: $('recent-activity'),
     lbTableWrap: $('lb-table-wrap'),
-    lbCount: $('lb-count')
+    lbCount: $('lb-count'),
+    btnStartQuiz: $('btn-start-quiz'),
+    quizStatus: $('quiz-status')
   };
 
   // ========== STATE ==========
@@ -157,6 +159,17 @@
 
   // ========== RENDER ==========
   function renderDashboard(data) {
+    if (data.quizState === 'WAITING') {
+      els.quizStatus.style.display = 'inline';
+      els.quizStatus.textContent = 'WAITING';
+      els.btnStartQuiz.style.display = 'inline-block';
+    } else {
+      els.quizStatus.style.display = 'inline';
+      els.quizStatus.textContent = 'LIVE';
+      els.quizStatus.style.color = 'var(--success)';
+      els.btnStartQuiz.style.display = 'none';
+    }
+
     // Stats
     animateNumber(els.statRegistered, data.stats.registered);
     animateNumber(els.statActive, data.stats.inProgress);
@@ -331,6 +344,20 @@
   function init() {
     els.loginForm.addEventListener('submit', handleLogin);
     els.btnLogout.addEventListener('click', handleLogout);
+    
+    els.btnStartQuiz.addEventListener('click', function() {
+      els.btnStartQuiz.disabled = true;
+      els.btnStartQuiz.textContent = 'Starting...';
+      apiCall({ action: 'startQuiz', adminEmail: adminCreds.email, adminPassword: adminCreds.password })
+        .then(function() {
+          fetchDashboard();
+        })
+        .catch(function(err) {
+          alert('Failed to start quiz: ' + err.message);
+          els.btnStartQuiz.disabled = false;
+          els.btnStartQuiz.textContent = 'Start Quiz';
+        });
+    });
 
     // Check for saved session
     var saved = sessionStorage.getItem('quizblitz_admin');

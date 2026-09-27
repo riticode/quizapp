@@ -26,6 +26,7 @@
 
   var screens = {
     register: $('screen-register'),
+    waiting: $('screen-waiting'),
     quiz: $('screen-quiz'),
     reveal: $('screen-reveal'),
     leaderboard: $('screen-leaderboard')
@@ -59,6 +60,7 @@
   var OPTION_LETTERS = ['A', 'B', 'C', 'D'];
   var CIRCUMFERENCE = 2 * Math.PI * 20;
   var SESSION_KEY = 'quizblitz_session';
+  var pollInterval = null;
 
   // ========== NETWORK ==========
 
@@ -124,9 +126,9 @@
 
   function showScreen(name) {
     Object.keys(screens).forEach(function (key) {
-      screens[key].classList.remove('active');
+      if(screens[key]) screens[key].classList.remove('active');
     });
-    screens[name].classList.add('active');
+    if(screens[name]) screens[name].classList.add('active');
   }
 
   function showLoading(show) {
@@ -140,6 +142,23 @@
 
   function hideError() {
     els.regError.hidden = true;
+  }
+
+  // ========== WAITING ROOM ==========
+  
+  function showWaitingRoom() {
+    showScreen('waiting');
+    clearInterval(pollInterval);
+    pollInterval = setInterval(function() {
+      apiCall({ action: 'getParticipantStatus', participantId: state.participantId })
+        .then(function(data) {
+          if (data.quizState === 'STARTED') {
+            clearInterval(pollInterval);
+            loadQuestion(Math.max(1, data.nextQuestion || 1));
+          }
+        })
+        .catch(function(){}); // ignore network errors during polling
+    }, 3000);
   }
 
   // ========== REGISTRATION ==========
@@ -197,7 +216,12 @@
         state.totalQuestions = data.totalQuestions || CONFIG.TOTAL_QUESTIONS;
         state.currentQuestion = 1;
         saveSession();
-        loadQuestion(1);
+        
+        if (data.quizState === 'WAITING') {
+          showWaitingRoom();
+        } else {
+          loadQuestion(1);
+        }
       })
       .catch(function (err) {
         showError(err.message || 'Registration failed. Please try again.');
@@ -230,10 +254,12 @@
           // Already finished — show leaderboard with fresh data
           state.currentQuestion = state.totalQuestions;
           loadLeaderboard();
+        } else if (data.quizState === 'WAITING') {
+          showWaitingRoom();
         } else {
           // Resume from next unanswered question
-          state.currentQuestion = data.nextQuestion;
-          loadQuestion(data.nextQuestion);
+          state.currentQuestion = Math.max(1, data.nextQuestion);
+          loadQuestion(state.currentQuestion);
         }
       })
       .catch(function () {
