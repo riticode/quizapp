@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="description" content="Live MCQ Quiz — Test your knowledge of Indian tech, startups, and pop culture with 12 rapid-fire questions.">
+  <title>QuizBlitz — Live MCQ Challenge</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+</head>
+<body>
+  <!-- ========== REGISTRATION SCREEN ========== -->
+  <section id="screen-register" class="screen active">
+    <div class="register-container">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <h1>QuizBlitz</h1>
+        <p class="brand-sub">12 Questions · 10 Seconds Each · Top 3 Win</p>
+      </div>
+      <form id="register-form" autocomplete="off" novalidate>
+        <div class="field">
+          <label for="reg-name">Full Name</label>
+          <input type="text" id="reg-name" placeholder="Enter your full name" required maxlength="100" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="reg-branch">Branch</label>
+          <input type="text" id="reg-branch" placeholder="e.g. CSE, ECE, MBA" required maxlength="50">
+        </div>
+        <div class="field">
+          <label for="reg-contact">Contact Number</label>
+          <input type="tel" id="reg-contact" placeholder="10-digit mobile number" required maxlength="15" autocomplete="tel">
+        </div>
+        <button type="submit" id="btn-start" class="btn-primary">
+          <span class="btn-text">Start Quiz</span>
+          <span class="btn-loader" hidden></span>
+        </button>
+        <p id="reg-error" class="error-msg" hidden></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- ========== QUIZ SCREEN ========== -->
+  <section id="screen-quiz" class="screen">
+    <div class="quiz-container">
+      <div class="quiz-header">
+        <div class="quiz-progress">
+          <span id="q-counter">1 / 12</span>
+          <div class="progress-bar">
+            <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+          </div>
+        </div>
+        <div class="quiz-timer" id="timer-ring">
+          <svg viewBox="0 0 48 48" class="timer-svg">
+            <circle cx="24" cy="24" r="20" class="timer-bg"/>
+            <circle cx="24" cy="24" r="20" class="timer-fg" id="timer-circle"/>
+          </svg>
+          <span id="timer-text" class="timer-text">10</span>
+        </div>
+      </div>
+      <div id="quiz-body" class="quiz-body">
+        <h2 id="q-text" class="q-text"></h2>
+        <div id="q-options" class="q-options"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== REVEAL SCREEN ========== -->
+  <section id="screen-reveal" class="screen">
+    <div class="reveal-container">
+      <div id="reveal-icon" class="reveal-icon">✓</div>
+      <h2 id="reveal-status" class="reveal-status">Correct!</h2>
+      <div class="reveal-answer">
+        <span class="reveal-label">Correct Answer</span>
+        <span id="reveal-answer-text" class="reveal-answer-text"></span>
+      </div>
+      <div class="reveal-hook">
+        <div class="hook-badge">💡 PM Insight</div>
+        <p id="reveal-hook-text"></p>
+      </div>
+      <button id="btn-next" class="btn-primary btn-next">
+        <span class="btn-text">Next Question</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ========== LEADERBOARD SCREEN ========== -->
+  <section id="screen-leaderboard" class="screen">
+    <div class="lb-container">
+      <div class="lb-header">
+        <div class="lb-trophy">🏆</div>
+        <h1>Leaderboard</h1>
+        <p class="lb-sub">Top 3 Performers</p>
+      </div>
+      <div id="lb-podium" class="lb-podium"></div>
+      <div id="lb-my-result" class="lb-my-result" hidden></div>
+      <button id="btn-finish" class="btn-primary btn-finish" onclick="location.reload()">
+        <span class="btn-text">Play Again</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ========== LOADING OVERLAY ========== -->
+  <div id="loading-overlay" class="loading-overlay" hidden>
+    <div class="spinner"></div>
+    <p>Connecting...</p>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
