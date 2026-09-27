@@ -10,8 +10,8 @@
 // ========== ADMIN CREDENTIALS ==========
 // IMPORTANT: Change these before deploying!
 // These are checked server-side only — never exposed to participants.
-var ADMIN_EMAIL = 'admin@quizblitz.com';
-var ADMIN_PASSWORD = 'change-this-password';
+var ADMIN_EMAIL = 'codework.riti@gmail.com';
+var ADMIN_PASSWORD = '7417914565';
 
 // ========== QUIZ DATA (from question.txt — verbatim) ==========
 var QUIZ_DATA = [
